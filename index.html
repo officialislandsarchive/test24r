@@ -1,57 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Retrieve UUIDs</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bluetooth LED Controller</title>
 </head>
 <body>
-  <h1>Retrieve BLE UUIDs</h1>
-  <button id="connectBtn">Connect to Device</button>
+  <h1>Bluetooth LED Controller</h1>
+  <button id="connectBtn">Connect to P031_CFC7</button>
+  <button id="turnOnBtn" disabled>Turn On</button>
+  <button id="turnOffBtn" disabled>Turn Off</button>
   <div id="status"></div>
-  <ul id="uuidList"></ul> <!-- List to display UUIDs -->
 
   <script>
+    let device;
+    let server;
+    let service;
+    let characteristic;
+
+    const SERVICE_UUID = '06293cc9-048c-4f11-b6fe-182f3352943b'; // Replace if needed
+    const CHARACTERISTIC_UUID = '0000aaa2-0000-1000-8000-aabbccddeeff'; // Replace with actual characteristic UUID
+
     function updateStatus(message) {
-      document.getElementById("status").innerText = message;
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = message;
       console.log(message);
     }
 
-    document.getElementById("connectBtn").addEventListener("click", async () => {
+    document.getElementById('connectBtn').addEventListener('click', async () => {
       try {
-        updateStatus("Requesting Bluetooth device...");
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: [] // No UUIDs specified for discovery
+        updateStatus('Requesting Bluetooth device...');
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'P031_CFC7' }],
+          optionalServices: [SERVICE_UUID]
         });
 
-        updateStatus(`Connected to ${device.name}`);
-        const server = await device.gatt.connect();
-        updateStatus("Connected to GATT server. Retrieving services...");
+        updateStatus(`Connecting to ${device.name}...`);
+        server = await device.gatt.connect();
 
-        const services = await server.getPrimaryServices();
-        const uuidList = document.getElementById("uuidList");
-        uuidList.innerHTML = "";
+        updateStatus('Getting service...');
+        service = await server.getPrimaryService(SERVICE_UUID);
 
-        for (const service of services) {
-          const serviceUUID = service.uuid;
-          const serviceItem = document.createElement("li");
-          serviceItem.textContent = `Service UUID: ${serviceUUID}`;
-          uuidList.appendChild(serviceItem);
-          console.log(`Service UUID: ${serviceUUID}`);
+        updateStatus('Getting characteristic...');
+        characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-          const characteristics = await service.getCharacteristics();
-          for (const characteristic of characteristics) {
-            const charUUID = characteristic.uuid;
-            const charItem = document.createElement("li");
-            charItem.style.marginLeft = "20px";
-            charItem.textContent = `Characteristic UUID: ${charUUID}`;
-            uuidList.appendChild(charItem);
-            console.log(`Characteristic UUID: ${charUUID}`);
-          }
-        }
-
-        updateStatus("UUIDs retrieved successfully.");
+        updateStatus('Connected! Ready to control the LED.');
+        document.getElementById('turnOnBtn').disabled = false;
+        document.getElementById('turnOffBtn').disabled = false;
       } catch (error) {
-        updateStatus("Error retrieving UUIDs. Make sure the Bluetooth device is nearby and Bluetooth is enabled.");
+        updateStatus(`Error: ${error.message}`);
+        console.error(error);
+      }
+    });
+
+    document.getElementById('turnOnBtn').addEventListener('click', async () => {
+      try {
+        updateStatus('Turning LED on...');
+        await characteristic.writeValue(new Uint8Array([1]));
+        updateStatus('LED turned on.');
+      } catch (error) {
+        updateStatus(`Error: ${error.message}`);
+        console.error(error);
+      }
+    });
+
+    document.getElementById('turnOffBtn').addEventListener('click', async () => {
+      try {
+        updateStatus('Turning LED off...');
+        await characteristic.writeValue(new Uint8Array([0]));
+        updateStatus('LED turned off.');
+      } catch (error) {
+        updateStatus(`Error: ${error.message}`);
         console.error(error);
       }
     });
