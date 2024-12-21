@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Control Day Beter LEDs</title>
+</head>
+<body>
+  <h1>Control Day Beter LEDs</h1>
+  <button id="connectBtn">Connect to P031_CFC7</button>
+  <button id="turnOnBtn" disabled>Turn On</button>
+  <button id="turnOffBtn" disabled>Turn Off</button>
+  <div id="status"></div> <!-- This will display status updates -->
+
+  <script>
+    let device;
+    let server;
+    let lightService;
+    let lightCharacteristic;
+
+    // Replace these with the actual UUIDs you found in the nRF Connect app
+    const serviceUUID = '0000aaa0-0000-1000-8000-aabbccddeeff'; // Example: '00001800-0000-1000-8000-00805f9b34fb'
+    const characteristicUUID = '0000aaa2-0000-1000-8000-aabbccddeeff'; // Example: '00002a00-0000-1000-8000-00805f9b34fb'
+
+    // Function to update status text
+    function updateStatus(message) {
+      document.getElementById("status").innerText = message;
+    }
+
+    // Connect to Bluetooth device
+    document.getElementById("connectBtn").addEventListener("click", async () => {
+      try {
+        updateStatus("Connecting to P031_CFC7...");
+
+        // Request the Bluetooth device
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'P031_CFC7' }],
+          optionalServices: [serviceUUID] // Replace with your service UUID
+        });
+
+        updateStatus(`Connected to ${device.name}`);
+
+        // Connect to the device's GATT server
+        server = await device.gatt.connect();
+
+        // Get the light service
+        lightService = await server.getPrimaryService(serviceUUID);
+
+        // Get the characteristic to control the light
+        lightCharacteristic = await lightService.getCharacteristic(characteristicUUID);
+
+        // Enable the control buttons once connected
+        document.getElementById("turnOnBtn").disabled = false;
+        document.getElementById("turnOffBtn").disabled = false;
+
+        console.log('Connected to device', device);
+      } catch (error) {
+        updateStatus("Failed to connect. Please ensure Bluetooth is enabled and try again.");
+        console.error('Error connecting to device', error);
+      }
+    });
+
+    // Turn on light
+    document.getElementById("turnOnBtn").addEventListener("click", async () => {
+      try {
+        updateStatus("Turning on light...");
+
+        // Send command to turn the light on (1 for on)
+        const onCommand = new Uint8Array([1]); // Example command to turn light on
+        await lightCharacteristic.writeValue(onCommand);
+        updateStatus("Light turned on.");
+        console.log('Light turned on');
+      } catch (error) {
+        updateStatus("Error turning on the light.");
+        console.error('Error turning on light', error);
+      }
+    });
+
+    // Turn off light
+    document.getElementById("turnOffBtn").addEventListener("click", async () => {
+      try {
+        updateStatus("Turning off light...");
+
+        // Send command to turn the light off (0 for off)
+        const offCommand = new Uint8Array([0]); // Example command to turn light off
+        await lightCharacteristic.writeValue(offCommand);
+        updateStatus("Light turned off.");
+        console.log('Light turned off');
+      } catch (error) {
+        updateStatus("Error turning off the light.");
+        console.error('Error turning off light', error);
+      }
+    });
+  </script>
+</body>
+</html>
