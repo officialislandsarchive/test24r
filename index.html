@@ -68,16 +68,31 @@
           optionalServices: [serviceUUID] // Replace with your service UUID
         });
 
-        updateStatus(`Connected to ${device.name}`);
+        updateStatus(`Device found: ${device.name}`);
 
         // Connect to the device's GATT server
         server = await device.gatt.connect();
+        updateStatus(`Connected to GATT server of ${device.name}`);
 
         // Get the light service
-        lightService = await server.getPrimaryService(serviceUUID);
+        try {
+          lightService = await server.getPrimaryService(serviceUUID);
+          updateStatus(`Service found: ${serviceUUID}`);
+        } catch (serviceError) {
+          console.error('Error getting light service', serviceError);
+          updateStatus(`Failed to find service with UUID: ${serviceUUID}`);
+          return;
+        }
 
         // Get the characteristic to control the light
-        lightCharacteristic = await lightService.getCharacteristic(characteristicUUID);
+        try {
+          lightCharacteristic = await lightService.getCharacteristic(characteristicUUID);
+          updateStatus(`Characteristic found: ${characteristicUUID}`);
+        } catch (charError) {
+          console.error('Error getting characteristic', charError);
+          updateStatus(`Failed to find characteristic with UUID: ${characteristicUUID}`);
+          return;
+        }
 
         // Enable the control buttons once connected
         document.getElementById("turnOnBtn").disabled = false;
@@ -85,8 +100,8 @@
 
         console.log('Connected to device', device);
       } catch (error) {
-        updateStatus("Failed to connect. Please ensure Bluetooth is enabled and try again.");
-        console.error('Error connecting to device', error);
+        console.error('Connection failed', error);
+        updateStatus(`Failed to connect. Error: ${error.message}`);
       }
     });
 
@@ -101,8 +116,8 @@
         updateStatus("Light turned on.");
         console.log('Light turned on');
       } catch (error) {
-        updateStatus("Error turning on the light.");
         console.error('Error turning on light', error);
+        updateStatus(`Error turning on the light. Message: ${error.message}`);
       }
     });
 
@@ -117,8 +132,8 @@
         updateStatus("Light turned off.");
         console.log('Light turned off');
       } catch (error) {
-        updateStatus("Error turning off the light.");
         console.error('Error turning off light', error);
+        updateStatus(`Error turning off the light. Message: ${error.message}`);
       }
     });
   </script>
