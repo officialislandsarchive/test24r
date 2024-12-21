@@ -1,58 +1,161 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Retrieve UUIDs</title>
+  <title>Control Day Beter LEDs</title>
 </head>
 <body>
-  <h1>Retrieve BLE UUIDs</h1>
-  <button id="connectBtn">Connect to Device</button>
-  <div id="status"></div>
-  <ul id="uuidList"></ul> <!-- List to display UUIDs -->
+  <h1>Control Day Beter LEDs</h1>
+  <button id="connectBtn">Connect to P031_CFC7</button>
+  <button id="turnOnBtn" disabled>Turn On</button>
+  <button id="turnOffBtn" disabled>Turn Off</button>
+  <div id="status"></div> <!-- This will display status updates -->
 
   <script>
+    let device;
+    let server;
+    let lightService;
+    let lightCharacteristic;
+
+    // Combined list of all UUIDs (both services and characteristics)
+    const allUUIDs = [
+      {
+        type: 'service',
+        uuid: '0000aaa0-0000-1000-8000-aabbccddeeff' // Example service UUID
+      },
+      {
+        type: 'characteristic',
+        uuid: '0000aaa1-0000-1000-8000-aabbccddeeff' // Example characteristic UUID
+      },
+      {
+        type: 'characteristic',
+        uuid: '0000aaa2-0000-1000-8000-aabbccddeeff' // Example characteristic UUID
+      }
+    ];
+
+    // Function to update status text
     function updateStatus(message) {
       document.getElementById("status").innerText = message;
-      console.log(message);
+      console.log(message); // Print the status message in the console for debugging
     }
 
+    // Detect Wi-Fi status
+    function getWiFiStatus() {
+      if (navigator.onLine) {
+        return 'Wi-Fi is connected and active.';
+      } else {
+        return 'Wi-Fi is NOT connected.';
+      }
+    }
+
+    // Detect Bluetooth status
+    function getBluetoothStatus() {
+      if (navigator.bluetooth) {
+        return 'Bluetooth is supported and available.';
+      } else {
+        return 'Bluetooth is NOT supported or enabled.';
+      }
+    }
+
+    // Show system info like Wi-Fi and Bluetooth status
+    function showSystemInfo() {
+      const wifiStatus = getWiFiStatus();
+      const bluetoothStatus = getBluetoothStatus();
+      updateStatus(`System Info:\n${wifiStatus}\n${bluetoothStatus}`);
+    }
+
+    // Call the system info function on page load
+    window.addEventListener('load', showSystemInfo);
+
+    // Connect to Bluetooth device
     document.getElementById("connectBtn").addEventListener("click", async () => {
       try {
-        updateStatus("Requesting Bluetooth device...");
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: [] // No UUIDs specified for discovery
+        updateStatus("Connecting to P031_CFC7...");
+
+        // Request the Bluetooth device
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'P031_CFC7' }],  // The name of your Bluetooth device
+          optionalServices: allUUIDs.filter(uuid => uuid.type === 'service').map(uuid => uuid.uuid) // Only service UUIDs
         });
 
         updateStatus(`Connected to ${device.name}`);
-        const server = await device.gatt.connect();
-        updateStatus("Connected to GATT server. Retrieving services...");
 
-        const services = await server.getPrimaryServices();
-        const uuidList = document.getElementById("uuidList");
-        uuidList.innerHTML = "";
+        // Connect to the device's GATT server
+        server = await device.gatt.connect();
+        updateStatus("Connected to GATT server.");
 
-        for (const service of services) {
-          const serviceUUID = service.uuid;
-          const serviceItem = document.createElement("li");
-          serviceItem.textContent = `Service UUID: ${serviceUUID}`;
-          uuidList.appendChild(serviceItem);
-          console.log(`Service UUID: ${serviceUUID}`);
+        // Loop through all UUIDs and attempt to find a valid service and characteristic
+        for (let uuid of allUUIDs) {
+          if (uuid.type === 'service') {
+            try {
+              // Look for the service
+              updateStatus(`Attempting to find service: ${uuid.uuid}`);
+              lightService = await server.getPrimaryService(uuid.uuid);
+              updateStatus(`Found service: ${uuid.uuid}`);
 
-          const characteristics = await service.getCharacteristics();
-          for (const characteristic of characteristics) {
-            const charUUID = characteristic.uuid;
-            const charItem = document.createElement("li");
-            charItem.style.marginLeft = "20px";
-            charItem.textContent = `Characteristic UUID: ${charUUID}`;
-            uuidList.appendChild(charItem);
-            console.log(`Characteristic UUID: ${charUUID}`);
+              // Now look for characteristics in this service
+              for (let characteristicUUID of allUUIDs.filter(item => item.type === 'characteristic').map(item => item.uuid)) {
+                try {
+                  updateStatus(`Attempting to find characteristic: ${characteristicUUID}`);
+                  // Look for the characteristic
+                  lightCharacteristic = await lightService.getCharacteristic(characteristicUUID);
+                  updateStatus(`Found characteristic: ${characteristicUUID}`);
+
+                  // If both service and characteristic are found, enable the control buttons
+                  document.getElementById("turnOnBtn").disabled = false;
+                  document.getElementById("turnOffBtn").disabled = false;
+
+                  console.log('Connected to service and characteristic', uuid.uuid, characteristicUUID);
+                  return; // Exit once a valid service/characteristic pair is found
+                } catch (error) {
+                  updateStatus(`Error finding characteristic: ${characteristicUUID}`);
+                  console.error(`Characteristic ${characteristicUUID} not found in service ${uuid.uuid}:`, error);
+                }
+              }
+            } catch (error) {
+              updateStatus(`Error finding service: ${uuid.uuid}`);
+              console.error(`Service ${uuid.uuid} not found:`, error);
+            }
           }
         }
 
-        updateStatus("UUIDs retrieved successfully.");
+        // If no valid service/characteristic pair was found, update status
+        updateStatus("No matching service/characteristic found.");
+
       } catch (error) {
-        updateStatus("Error retrieving UUIDs. Make sure the Bluetooth device is nearby and Bluetooth is enabled.");
-        console.error(error);
+        updateStatus("Failed to connect. Please ensure Bluetooth is enabled and try again.");
+        console.error('Error connecting to device:', error);
+      }
+    });
+
+    // Turn on light
+    document.getElementById("turnOnBtn").addEventListener("click", async () => {
+      try {
+        updateStatus("Turning on light...");
+
+        // Send command to turn the light on (1 for on)
+        const onCommand = new Uint8Array([1]); // Example command to turn light on
+        await lightCharacteristic.writeValue(onCommand);
+        updateStatus("Light turned on.");
+        console.log('Light turned on');
+      } catch (error) {
+        updateStatus("Error turning on the light.");
+        console.error('Error turning on light:', error);
+      }
+    });
+
+    // Turn off light
+    document.getElementById("turnOffBtn").addEventListener("click", async () => {
+      try {
+        updateStatus("Turning off light...");
+
+        // Send command to turn the light off (0 for off)
+        const offCommand = new Uint8Array([0]); // Example command to turn light off
+        await lightCharacteristic.writeValue(offCommand);
+        updateStatus("Light turned off.");
+        console.log('Light turned off');
+      } catch (error) {
+        updateStatus("Error turning off the light.");
+        console.error('Error turning off light:', error);
       }
     });
   </script>
