@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Control Day Beter LEDs</title>
 </head>
 <body>
@@ -8,7 +10,12 @@
   <button id="connectBtn">Connect to P031_CFC7</button>
   <button id="turnOnBtn" disabled>Turn On</button>
   <button id="turnOffBtn" disabled>Turn Off</button>
+
   <div id="status"></div> <!-- This will display status updates -->
+  <div id="deviceInfo">
+    <p><strong>Wi-Fi Status:</strong> <span id="wifiStatus">Checking...</span></p>
+    <p><strong>Bluetooth Status:</strong> <span id="bluetoothStatus">Checking...</span></p>
+  </div> <!-- Additional device information -->
 
   <script>
     let device;
@@ -24,6 +31,31 @@
     function updateStatus(message) {
       document.getElementById("status").innerText = message;
     }
+
+    // Function to check if Wi-Fi is connected (basic check using navigator.connection)
+    function checkWifiStatus() {
+      if (navigator.connection && navigator.connection.type) {
+        const wifiStatus = navigator.connection.type === "wifi" ? "Connected" : "Not connected to Wi-Fi";
+        document.getElementById("wifiStatus").innerText = wifiStatus;
+      } else {
+        document.getElementById("wifiStatus").innerText = "Unable to determine Wi-Fi status";
+      }
+    }
+
+    // Function to check Bluetooth availability
+    function checkBluetoothStatus() {
+      if (navigator.bluetooth) {
+        document.getElementById("bluetoothStatus").innerText = "Bluetooth is supported and available.";
+      } else {
+        document.getElementById("bluetoothStatus").innerText = "Bluetooth is not supported or unavailable on this device.";
+      }
+    }
+
+    // Call functions on page load to check Wi-Fi and Bluetooth
+    window.onload = () => {
+      checkWifiStatus();
+      checkBluetoothStatus();
+    };
 
     // Connect to Bluetooth device
     document.getElementById("connectBtn").addEventListener("click", async () => {
